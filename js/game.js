@@ -16,6 +16,8 @@ var cs = [0x41bf63, 0x34523c];
 var board = [];
 var game = new Phaser.Game(config);
 var chosenPiece = null;
+var doupdate = true; // so we don't redraw all the time
+var turn = 0;
 
 var Queen = function(pos){
     this.type = 0;
@@ -90,8 +92,11 @@ Pawn.prototype.getmoves = function(){
 
 var Aps = [new Queen({'x':0,'y':0}),new Queen({'x':1,'y':0}),new Queen({'x':0,'y':1}), new Drone({'x':1,'y':1}),new Drone({'x':2,'y':0}),new Drone({'x':0,'y':2}), new Pawn({'x':2,'y':1}),new Pawn({'x':1,'y':2}),new Pawn({'x':2,'y':2})];
 
+var Acapture = [];
+
 var Bps = [new Queen({'x':3,'y':7}),new Queen({'x':3,'y':6}),new Queen({'x':2,'y':7}), new Drone({'x':2,'y':6}),new Drone({'x':1,'y':7}),new Drone({'x':3,'y':5}), new Pawn({'x':1,'y':6}),new Pawn({'x':1,'y':5}),new Pawn({'x':2,'y':5})];
 
+var Bcapture = [];
 
 function drawPiece(p,g){
     //console.log("drawing piece at:");
@@ -167,7 +172,13 @@ function drawmoves(p, g)
         if (isvalidmove(p.pos, {'x':x,'y':y})){
             //console.log("we in here");
             //console.log('hmm');
+            v = isoccupied(x,y);
             g.add.rectangle(x*tilesize + 50, y*tilesize + 50, tilesize, tilesize, cs[(x+y)%2]+0x555555);
+            if (v){
+                var size =  [30,20,10][v.type];
+                g.add.ellipse(x*tilesize+50,y*tilesize+50,size,size,0xfc4503);
+            }
+            
         }
     }
 
@@ -187,19 +198,50 @@ function checkmove(p, dst){
     return false;
 }
 
+function allpieces(){
+    var allp = Aps.slice();
+    allp = allp.concat(Bps.slice());
+    return allp;
+}
+
+function calcscore(list){
+    var result=0;
+    var values = [3,2,1];
+    var i;
+    for(i=0;i<list.length;i++){
+        result += values[list[i].type];
+    }
+    return result;
+}
+
+function capture(p){
+    var index = ((p.pos.y > 3) ? Bps.indexOf(p) : Aps.indexOf(p));
+    ((p.pos.y > 3) ? Bps.pop(index) : Aps.pop(index));
+    ((p.pos.y > 3) ? Acapture.push(p) : Bcapture.push(p));
+}
+
 function onclick(pointer){
+    doupdate = true;
     console.log('clicked!');
     var x = parseInt(pointer.x/tilesize);
     var y = parseInt(pointer.y/tilesize);
     console.log(x.toString() + ' ' + y.toString());
     var c = isoccupied(x,y);
-    if (!c && chosenPiece && checkmove(chosenPiece, {'x':x, 'y':y})){
-        console.log('wtf');
+    if (chosenPiece && checkmove(chosenPiece, {'x':x, 'y':y})){
+        if (c){
+            console.log("occupied!");
+            capture(c);
+        }
         chosenPiece.pos.x = x;
         chosenPiece.pos.y = y;
+        //taking = true;
+        turn = [1,0][turn];
         chosenPiece = null;
     } else if (c){
-        chosenPiece = c;
+        if ((c.pos.y > 3 && turn == 1) || (c.pos.y <= 3 && turn==0)){
+            chosenPiece = c;
+        }
+        
     }
     
 
@@ -218,10 +260,9 @@ function drawboard(g){
         }
     }
 
-    drawPiece(Aps[0],g);
-    for (i=0; i<Aps.length;i++){
-        drawPiece(Aps[i], g);
-        drawPiece(Bps[i], g)
+    var allp = allpieces();
+    for (i=0; i<allp.length;i++){
+        drawPiece(allp[i], g);
     }
     
 }
@@ -229,19 +270,24 @@ function drawboard(g){
 function create ()
 {
     
-
-    // draw pi
-    //timerEvent = this.time.addEvent({ delay: 4000, repeat: 9 });
-    
-    //drawmoves(Aps[6], this);
     graphics = this.add.graphics({ x: 0, y: 0 });
 
     this.input.on('pointerdown',onclick, this);
 }
 
-function update ()
+function update()
 {
-
+    if (!doupdate){
+        return;
+    }
+    $("#score1").text(calcscore(Acapture).toString());
+    $("#score2").text(calcscore(Bcapture).toString());
+    if (turn==1){
+        $("#turn").text("player 2's turn");
+    } else {
+        $("#turn").text("player 1's turn");
+    }
+    doupdate=false;
     drawboard(this)
     graphics.clear();
     if (chosenPiece){
