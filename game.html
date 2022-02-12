@@ -14,32 +14,37 @@
   integrity="sha256-HwWONEZrpuoh951cQD1ov2HUK5zA5DwJ1DNUXaM6FsY="
   crossorigin="anonymous"></script>
 <style type="text/css">
+    html {
+        background-color: black;
+    }
     #root {
       background-color: #eee;
     }
-   #game {
-   float: left;
 
-    }
    #info {
-   float: right;
+   float: left;
    padding-right: 30%;
    padding-left: 30%;
    font-family: 'Supermercado One', cursive;
-   background-color: antiquewhite;
+   background-color: rgb(226, 179, 118);
    }
+
 
  </style>
 </head>
 <body>
 <div  id="info">
-    <h1 id="turn">Player1's turn!</h1>
+    <h1 id="turn">Player 1's turn!</h1>
     <h2>score:</h2>
     <h3 id="score1"></h3>
     <h3 id="score2"></h3>
+    <input id="input"></input><button id="joinbutton">join game</button>
 </div>
-<div id="game"></div>
+<div></div>
+<div id="game">
 <script src="js/phaser.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
 <script src="js/game.js"></script>
+</div>
 </body>
 </html>

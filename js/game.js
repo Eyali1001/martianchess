@@ -1,3 +1,4 @@
+
 var config = {
     type: Phaser.AUTO,
     width: 350,
@@ -18,6 +19,10 @@ var game = new Phaser.Game(config);
 var chosenPiece = null;
 var doupdate = true; // so we don't redraw all the time
 var turn = 0;
+var mode = 0; // 0 for local game, 1 for online
+var whoami = 0; // for online play, do I go first
+var roomid;
+
 
 var Queen = function(pos){
     this.type = 0;
@@ -98,6 +103,38 @@ var Bps = [new Queen({'x':3,'y':7}),new Queen({'x':3,'y':6}),new Queen({'x':2,'y
 
 var Bcapture = [];
 
+var allps = Aps.concat(Bps);
+
+var socket = io();
+$("#joinbutton").click(function() {
+    console.log("join clicked");
+    var text = $("#input").val();
+    roomid = text;
+    socket.emit('game secret', text);
+});
+socket.on("start game", (msg) => {
+
+    mode = 1; // means 2 people connected with same room id.
+    whoami = parseInt(msg);
+    $("#turn").text("Connected to room. you are  " + (whoami ? "Player 2" : "Player 1"));
+});
+socket.on("gotmove", (msg) => {
+    if (turn==whoami){ //its my turn bro
+        return;
+    }
+    //move format is x,y!nx,ny
+    var p = msg.split("!");
+    var oldpos = p[0].split(',');
+    var newpos = p[1].split(',');
+    var p = isoccupied(oldpos[0],oldpos[1]);
+    var target = isoccupied(newpos[0], newpos[1]);
+    if (target){capture(target);}
+    p.pos.x = parseInt(newpos[0]);
+    p.pos.y = parseInt(newpos[1]);
+    turn = 1^turn;
+    doupdate=true;
+});
+
 function drawPiece(p,g){
     //console.log("drawing piece at:");
     //console.log(p.pos.x);
@@ -115,8 +152,7 @@ function drawPiece(p,g){
 
 
 function isoccupied(x,y){
-    var allp = Aps.slice();
-    allp = allp.concat(Bps.slice());
+    allp = allps;
     for (i=0; i<allp.length;i++){
         if((allp[i].pos.x == x && allp[i].pos.y==y)){
             return allp[i];
@@ -198,12 +234,6 @@ function checkmove(p, dst){
     return false;
 }
 
-function allpieces(){
-    var allp = Aps.slice();
-    allp = allp.concat(Bps.slice());
-    return allp;
-}
-
 function calcscore(list){
     var result=0;
     var values = [3,2,1];
@@ -215,8 +245,9 @@ function calcscore(list){
 }
 
 function capture(p){
-    var index = ((p.pos.y > 3) ? Bps.indexOf(p) : Aps.indexOf(p));
-    ((p.pos.y > 3) ? Bps.pop(index) : Aps.pop(index));
+    var index = allps.indexOf(p);
+    allps.splice(index,1);
+
     ((p.pos.y > 3) ? Acapture.push(p) : Bcapture.push(p));
 }
 
@@ -230,15 +261,20 @@ function onclick(pointer){
     if (chosenPiece && checkmove(chosenPiece, {'x':x, 'y':y})){
         if (c){
             console.log("occupied!");
+            //console.log('capturing at' + c.pos.x.toString() + ' ' + c.pos.y.toString());
             capture(c);
         }
+        var oldpos = [chosenPiece.pos.x, chosenPiece.pos.y];
         chosenPiece.pos.x = x;
         chosenPiece.pos.y = y;
         //taking = true;
         turn = [1,0][turn];
+        //emit the move that just happened
+        var move = [whoami.toString(), ':', roomid, ":", oldpos[0],",",oldpos[1],"!",x,',',y];
+        socket.emit('move', "".concat(...move));
         chosenPiece = null;
     } else if (c){
-        if ((c.pos.y > 3 && turn == 1) || (c.pos.y <= 3 && turn==0)){
+        if (whoami==turn && (whoami || !(c.pos.y>3))){
             chosenPiece = c;
         }
         
@@ -260,7 +296,7 @@ function drawboard(g){
         }
     }
 
-    var allp = allpieces();
+    var allp = allps;
     for (i=0; i<allp.length;i++){
         drawPiece(allp[i], g);
     }
